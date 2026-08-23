@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Hide Alpine-cloaked elements (switcher panel, toasts) until Alpine boots,
+   so nothing flashes on load. */
+[x-cloak] {
+    display: none !important;
+}
+
+@layer base {
+    body {
+        @apply bg-canvas text-gray-700 antialiased;
+        font-family: theme('fontFamily.sans');
+    }
+}

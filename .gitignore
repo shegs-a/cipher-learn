@@ -1,0 +1,34 @@
+# Laravel / PHP
+/vendor
+/node_modules
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+
+# Local sqlite (tests use in-memory; this is only a dev convenience file)
+/database/*.sqlite
+/database/*.sqlite-journal
+
+# Environment & secrets — never commit
+.env
+.env.backup
+.env.production
+*.pem
+auth.json
+
+# Local tooling / editor
+/.phpunit.cache
+.phpunit.result.cache
+.DS_Store
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+
+# Claude Code local settings (machine-specific, may hold local perms)
+/.claude/settings.local.json
+
+# Design canvas runtime helper is kept; nothing to ignore in /design

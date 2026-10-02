@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Widgets;
 
+use App\Hris\Sync\LeaveDataStatus;
 use App\Support\DashboardMetrics;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -32,7 +33,7 @@ class AdminOverviewStats extends StatsOverviewWidget
         $overdue = $m->overdue();
         $recert = $m->recertDueSoon();
 
-        return [
+        $stats = [
             Stat::make('Active headcount', $m->activeHeadcount())
                 ->description($m->leavers().' leavers')
                 ->color('primary'),
@@ -53,5 +54,31 @@ class AdminOverviewStats extends StatsOverviewWidget
                 ->description($recert.' due for recert ≤ 60 days')
                 ->color($recert > 0 ? 'warning' : 'gray'),
         ];
+
+        $leave = $this->leaveDataStat();
+
+        return $leave === null ? $stats : [...$stats, $leave];
+    }
+
+    /**
+     * How fresh the leave data behind the assignment leave-check is — only shown for
+     * organisations whose HR system provides leave. Amber when stale, so an admin
+     * notices a sync that has quietly stopped working before it matters.
+     */
+    private function leaveDataStat(): ?Stat
+    {
+        $tenant = auth()->user()?->tenant;
+        $status = app(LeaveDataStatus::class);
+
+        if ($tenant === null || ! $status->isTracked($tenant)) {
+            return null;
+        }
+
+        $last = $status->lastSuccessfulSync($tenant);
+        $stale = $status->isStale($tenant);
+
+        return Stat::make('Leave data', $last === null ? 'Never synced' : $last->diffForHumans())
+            ->description($stale ? 'Out of date — assignments may miss recent leave' : 'Used to check leave when assigning')
+            ->color($stale ? 'warning' : 'success');
     }
 }

@@ -4,17 +4,30 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Actions\Assignment\AssignCourseToEmployees;
+use App\Actions\Learning\AssignLearningPathToEmployees;
+use App\Enums\CourseStatus;
 use App\Enums\EmployeeStatus;
 use App\Filament\Resources\EmployeeResource\Pages;
+use App\Filament\Support\AssignmentFeedback;
+use App\Models\Course;
 use App\Models\Employee;
+use App\Models\LearningPath;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Actions\BulkActionGroup;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * Read-only view of the workforce synced from the HR system.
@@ -134,6 +147,71 @@ class EmployeeResource extends Resource
             ])
             ->actions([
                 ViewAction::make(),
+            ])
+            ->bulkActions([
+                // Assign to a hand-picked set of people. Same domain services as the
+                // org-wide flows, so the leave policy applies identically and the admin
+                // sees exactly who was assigned, blocked (on leave) or skipped.
+                BulkActionGroup::make([
+                    BulkAction::make('assignCourse')
+                        ->label('Assign course')
+                        ->icon('heroicon-o-academic-cap')
+                        ->visible(fn (): bool => auth()->user()?->can('enrollments.assign_org') ?? false)
+                        ->form([
+                            Select::make('course_id')
+                                ->label('Course')
+                                ->options(fn (): array => Course::query()
+                                    ->where('status', CourseStatus::Published->value)
+                                    ->orderBy('title')->pluck('title', 'id')->all())
+                                ->searchable()
+                                ->required(),
+                            Textarea::make('rationale')->label('Why this course?')->required()->rows(3)
+                                ->helperText('The reason every assigned learner will see.'),
+                            DatePicker::make('due_at')->label('Due date')->native(false),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            /** @var Collection<int, Employee> $records */
+                            $result = app(AssignCourseToEmployees::class)->handle(
+                                course: Course::query()->findOrFail($data['course_id']),
+                                employees: $records,
+                                rationale: $data['rationale'],
+                                scope: 'selection',
+                                dueAt: filled($data['due_at'] ?? null) ? Carbon::parse($data['due_at']) : null,
+                                assignedBy: auth()->user(),
+                            );
+
+                            AssignmentFeedback::bulk($result, 'Course assignment complete')->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('assignPath')
+                        ->label('Assign learning path')
+                        ->icon('heroicon-o-map')
+                        ->visible(fn (): bool => auth()->user()?->can('enrollments.assign_org') ?? false)
+                        ->form([
+                            Select::make('path_id')
+                                ->label('Learning path')
+                                ->options(fn (): array => LearningPath::query()->orderBy('name')->pluck('name', 'id')->all())
+                                ->searchable()
+                                ->required(),
+                            Textarea::make('rationale')->label('Why this path?')->required()->rows(3),
+                            DatePicker::make('due_at')->label('Due date')->native(false),
+                        ])
+                        ->action(function (Collection $records, array $data): void {
+                            /** @var Collection<int, Employee> $records */
+                            $result = app(AssignLearningPathToEmployees::class)->handle(
+                                path: LearningPath::query()->findOrFail($data['path_id']),
+                                employees: $records,
+                                rationale: $data['rationale'],
+                                scope: 'selection',
+                                dueAt: filled($data['due_at'] ?? null) ? Carbon::parse($data['due_at']) : null,
+                                assignedBy: auth()->user(),
+                            );
+
+                            AssignmentFeedback::bulk($result, 'Learning path assignment complete')->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ]),
             ]);
     }
 

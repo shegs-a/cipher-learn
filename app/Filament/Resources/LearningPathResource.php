@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Actions\Learning\AssignLearningPath;
-use App\Enums\EnrollmentSource;
+use App\Actions\Learning\AssignLearningPathOrgWide;
 use App\Filament\Concerns\AuthorizesViaPermissions;
 use App\Filament\Resources\LearningPathResource\Pages;
 use App\Filament\Resources\LearningPathResource\RelationManagers\CoursesRelationManager;
+use App\Filament\Support\AssignmentFeedback;
 use App\Models\Employee;
 use App\Models\LearningPath;
 use Filament\Forms\Components\DatePicker;
@@ -16,7 +17,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\EditAction;
@@ -87,46 +87,18 @@ class LearningPathResource extends Resource
                         DatePicker::make('due_at')->label('Due date')->native(false),
                     ])
                     ->action(function (LearningPath $record, array $data): void {
-                        $count = self::assignToWorkforce($record, $data);
+                        $result = app(AssignLearningPathOrgWide::class)->handle(
+                            path: $record,
+                            rationale: $data['rationale'],
+                            department: $data['department'] ?: null,
+                            dueAt: filled($data['due_at'] ?? null) ? Carbon::parse($data['due_at']) : null,
+                            assignedBy: auth()->user(),
+                        );
 
-                        Notification::make()
-                            ->title('Learning path assigned')
-                            ->body("Assigned to {$count} ".str('employee')->plural($count).'.')
-                            ->success()
-                            ->send();
+                        AssignmentFeedback::bulk($result, 'Learning path assignment complete')->send();
                     }),
                 EditAction::make(),
             ]);
-    }
-
-    /**
-     * Fan the path out across active employees (all, or one department), returning
-     * how many were enrolled.
-     *
-     * @param  array<string, mixed>  $data
-     */
-    private static function assignToWorkforce(LearningPath $path, array $data): int
-    {
-        $dueAt = filled($data['due_at'] ?? null) ? Carbon::parse($data['due_at']) : null;
-        $assignPath = app(AssignLearningPath::class);
-
-        $employees = Employee::query()
-            ->where('status', 'active')
-            ->when(filled($data['department'] ?? null), fn ($q) => $q->where('department', $data['department']))
-            ->get();
-
-        foreach ($employees as $employee) {
-            $assignPath->handle(
-                path: $path,
-                employee: $employee,
-                rationale: $data['rationale'],
-                source: EnrollmentSource::Manual,
-                dueAt: $dueAt,
-                assignedBy: auth()->user(),
-            );
-        }
-
-        return $employees->count();
     }
 
     public static function getRelations(): array

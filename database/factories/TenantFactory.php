@@ -22,6 +22,7 @@ class TenantFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 99999),
+            'timezone' => 'UTC',
             'hris_adapter' => 'mock',
             'settings' => null,
         ];

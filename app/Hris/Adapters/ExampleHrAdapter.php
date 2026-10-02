@@ -6,11 +6,13 @@ namespace App\Hris\Adapters;
 
 use App\Enums\EmployeeStatus;
 use App\Hris\Contracts\HrisEmployeeSource;
+use App\Hris\Contracts\HrisLeaveSource;
 use App\Hris\Contracts\HrisWriteback;
 use App\Hris\Data\EmployeeData;
 use App\Hris\Data\TrainingCompletionData;
 use App\Hris\Exceptions\HrisConnectionException;
 use App\Hris\Exceptions\HrisUnsupportedOperation;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Throwable;
@@ -33,7 +35,7 @@ use Throwable;
  * field mapping as a starting point to confirm against a real response before any
  * real integration.
  */
-final class ExampleHrAdapter implements HrisEmployeeSource, HrisWriteback
+final class ExampleHrAdapter implements HrisEmployeeSource, HrisLeaveSource, HrisWriteback
 {
     /** @param array<string, mixed> $settings Per-tenant config from tenants.settings. */
     public function __construct(private readonly array $settings = []) {}
@@ -41,6 +43,24 @@ final class ExampleHrAdapter implements HrisEmployeeSource, HrisWriteback
     public function name(): string
     {
         return 'example';
+    }
+
+    /**
+     * ExampleHR's public docs publish no leave endpoint, so this adapter honestly
+     * reports the capability as absent (same modelling as write-back). The leave
+     * sync skips tenants on this adapter rather than faking an empty calendar.
+     */
+    public function supportsLeave(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @return iterable<int, never>
+     */
+    public function fetchLeave(CarbonImmutable $from, CarbonImmutable $to): iterable
+    {
+        throw HrisUnsupportedOperation::for($this->name(), 'fetchLeave');
     }
 
     /**

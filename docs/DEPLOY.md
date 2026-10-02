@@ -85,7 +85,19 @@ docker compose -f docker-compose.prod.yml exec app php artisan db:seed --force
 - **Scheduler** dispatches (see `bootstrap/app.php`): `outbox:work` (every minute,
   HRIS write-back drain), `hris:sync-employees --all` (nightly), `audit:verify
   --all` (nightly integrity check — a non-zero exit is your alert), and
-  `notifications:overdue` (daily overdue nudges).
+  `notifications:overdue` (daily overdue nudges), and `hris:dispatch-leave-syncs`
+  (every 10 minutes — see below).
+- **Leave sync.** Each tenant's leave is refreshed from the HR system at **06:00 and
+  18:00 in that tenant's own timezone** (`tenants.timezone`, an IANA name such as
+  `Africa/Lagos`; set it when provisioning a tenant — it defaults to `UTC` only to
+  backfill existing rows). Because the scheduler fires in one timezone, it ticks every
+  10 minutes and the dispatcher runs whichever tenants have a slot due, once per slot.
+  **The scheduler must therefore be running** for leave to refresh. Course assignment
+  reads only the local `employee_leaves` table, never the HR system. Every run
+  (scheduled or manual) is recorded under People › Sync history; failures email
+  tenant users holding `hris.sync`. Admins can refresh on demand with **Sync leave
+  now**. Run `permissions:sync` after upgrading so `hris.sync` and
+  `settings.assignment_policy` reach existing tenants.
 - **Queue worker** processes queued notifications (email + in-app). Scale with
   `--scale queue=N`.
 - Both are guarded `withoutOverlapping()` + `onOneServer()`, so in a multi-node
@@ -102,6 +114,8 @@ default in `.env.example`).
 php artisan permissions:sync            # re-grant permissions across all tenants
 php artisan audit:verify --all          # verify every tenant's audit chain
 php artisan hris:sync-employees --all   # pull the workforce from the HRIS
+php artisan hris:sync-leave --all       # pull approved leave now (recorded as a manual run)
+php artisan hris:dispatch-leave-syncs   # what the scheduler runs: syncs tenants whose 06:00/18:00 is due
 php artisan outbox:work                 # drain the training-completion write-back outbox
 php artisan notifications:overdue       # send overdue-training reminders
 ```

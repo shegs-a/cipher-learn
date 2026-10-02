@@ -73,10 +73,24 @@ class SyncRunResource extends Resource
                         'failed' => 'danger',
                         'running' => 'warning',
                         default => 'gray',
-                    }),
+                    })
+                    // A failed or skipped run explains itself on hover.
+                    ->tooltip(fn (SyncRun $record): ?string => $record->stats['error']
+                        ?? $record->stats['reason']
+                        ?? (($record->stats['wipe_guard_tripped'] ?? false) ? 'The HR system returned no leave records, so existing leave was left untouched.' : null)),
+                // How it started: the scheduled slot (tenant-local) or who clicked the button.
+                TextColumn::make('trigger')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'manual' ? 'info' : 'gray')
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                TextColumn::make('slot')->label('Slot')->placeholder('—')->toggleable(),
+                TextColumn::make('triggeredBy.name')->label('Triggered by')->placeholder('—')->toggleable(),
                 // Individual stat counts read straight out of the JSON column.
+                TextColumn::make('stats.fetched')->label('Fetched')->alignCenter()->placeholder('—')->toggleable(),
                 TextColumn::make('stats.created')->label('Created')->alignCenter()->placeholder('—'),
                 TextColumn::make('stats.updated')->label('Updated')->alignCenter()->placeholder('—'),
+                TextColumn::make('stats.removed')->label('Removed')->alignCenter()->placeholder('—')->toggleable(),
+                TextColumn::make('stats.unmatched')->label('Unmatched')->alignCenter()->placeholder('—')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('stats.unchanged')->label('Unchanged')->alignCenter()->placeholder('—')->toggleable(),
                 TextColumn::make('stats.exited')->label('Exited')->alignCenter()->placeholder('—'),
                 TextColumn::make('stats.errors')
@@ -103,6 +117,7 @@ class SyncRunResource extends Resource
             ->filters([
                 SelectFilter::make('type')->options([
                     'employee_sync' => 'Employee sync',
+                    'leave_sync' => 'Leave sync',
                     'assignment_sweep' => 'Assignment sweep',
                     'reconciliation' => 'Reconciliation',
                     'recertification' => 'Recertification',
@@ -111,6 +126,11 @@ class SyncRunResource extends Resource
                     'completed' => 'Completed',
                     'failed' => 'Failed',
                     'running' => 'Running',
+                    'skipped' => 'Skipped',
+                ]),
+                SelectFilter::make('trigger')->options([
+                    'scheduled' => 'Scheduled',
+                    'manual' => 'Manual',
                 ]),
             ]);
     }

@@ -70,13 +70,21 @@ class Team extends Component
 
         $course = Course::query()->findOrFail($this->courseId);
 
-        app(AssignCourse::class)->handle(
+        $result = app(AssignCourse::class)->attempt(
             employee: $report,
             course: $course,
             rationale: $this->reason,
             assignedBy: auth()->user(),
             dueAt: $this->dueDate ? Carbon::parse($this->dueDate) : null,
         );
+
+        // Policy refused it (the report is on leave): say so and keep the form open
+        // rather than pretending it worked. The manager has also been notified.
+        if ($result->isBlocked()) {
+            $this->addError('courseId', $result->message($course->title).' Your organisation’s policy does not allow assignments to employees on leave.');
+
+            return;
+        }
 
         $this->cancelAssign();
         $this->dispatch('course-assigned');

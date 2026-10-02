@@ -15,6 +15,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property EmployeeStatus $status
+ * @property string $tenant_id
+ */
 class Employee extends Model
 {
     /** @use HasFactory<EmployeeFactory> */
@@ -59,6 +63,12 @@ class Employee extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(Employee::class, 'manager_id');
+    }
+
+    /** @return HasMany<EmployeeLeave, $this> */
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(EmployeeLeave::class);
     }
 
     /** @return HasMany<Enrollment, $this> */

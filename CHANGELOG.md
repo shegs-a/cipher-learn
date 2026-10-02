@@ -11,10 +11,38 @@ _Unreleased_ until the next tag.
 
 ## [Unreleased]
 
-_Nothing yet — V2 work will land here. Planned: the performance-gap rules engine +
-AI recommender (as a hosted service), single-tenant / on-prem mode + SSO, audit
-hardening (DB-level WORM, HMAC-keyed chain, allowlist redaction), and path-level
-certificates._
+### Added
+
+- **Leave-aware assignment** (issue #1, Sprint 13) — a tenant policy,
+  _Allow admins assign courses and learning paths to employees on leave_ (off by
+  default), enforced in the shared assignment services so it covers individual,
+  bulk, department, organisation-wide and learning-path assignment, and any future
+  workflow that uses them. A blocked employee gets no enrolment, no path membership
+  (never a partial path) and no notification; the initiating admin gets one notice
+  (one summary for a bulk run). Bulk runs never fail because someone is on leave and
+  report assigned / blocked / skipped separately.
+- **Leave data via the HRIS port** — `HrisLeaveSource` / `LeaveData`, mirrored into a
+  local `employee_leaves` table at 06:00 and 18:00 in each tenant's own timezone
+  (new required `tenants.timezone`), plus an admin **Sync leave now** button.
+  Assignment reads only the local table, so an HR-system outage cannot block it; stale
+  data fails open and is flagged in the audit trail.
+- **Sync reporting** — every sync run records its trigger (scheduled slot / manual +
+  who), counts and duration in Sync history; failures notify admins; a dashboard stat
+  shows leave-data freshness.
+- **Auditability** — `assignment.blocked`, `assignment.allowed_on_leave`,
+  `assignment.bulk_completed` and `settings.assignment_policy_changed` events.
+- Bulk **Assign course / Assign learning path** actions on the Employees table.
+
+### Changed
+
+- `AssignCourse::attempt()` / `AssignLearningPath::attempt()` return a structured
+  result; `handle()` keeps returning the model but throws `AssignmentBlockedException`
+  when policy blocks. `AssignCourseOrgWide` now returns an `AssignmentResult` rather
+  than a count.
+
+_Still planned for V2: the performance-gap rules engine + AI recommender (as a hosted
+service), single-tenant / on-prem mode + SSO, audit hardening (DB-level WORM,
+HMAC-keyed chain, allowlist redaction), and path-level certificates._
 
 ## [1.0.0] - 2026-08-04
 

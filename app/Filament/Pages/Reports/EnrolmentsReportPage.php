@@ -7,6 +7,7 @@ namespace App\Filament\Pages\Reports;
 use App\Actions\Assignment\AssignCourse;
 use App\Enums\EnrollmentStatus;
 use App\Filament\Pages\Concerns\RendersReport;
+use App\Filament\Support\AssignmentFeedback;
 use App\Models\Enrollment;
 use App\Notifications\AccessRequestRejectedNotification;
 use Filament\Forms\Components\DatePicker;
@@ -70,13 +71,19 @@ class EnrolmentsReportPage extends Page implements HasForms, HasTable
                     DatePicker::make('due_at')->label('Due date')->native(false),
                 ])
                 ->action(function (Enrollment $record, array $data): void {
-                    app(AssignCourse::class)->handle(
+                    $result = app(AssignCourse::class)->attempt(
                         employee: $record->employee,
                         course: $record->course,
                         rationale: $data['rationale'],
                         assignedBy: auth()->user(),
                         dueAt: filled($data['due_at']) ? Carbon::parse($data['due_at']) : null,
                     );
+
+                    // Approving a request IS an assignment, so the leave policy applies:
+                    // a blocked approval leaves the request pending and says why.
+                    if ($result->isBlocked()) {
+                        AssignmentFeedback::single($result, $record->course->title)->send();
+                    }
 
                     $this->resetTable();
                 }),

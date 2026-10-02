@@ -16,7 +16,7 @@ class DispatchLeaveSyncsCommand extends Command
 {
     protected $signature = 'hris:dispatch-leave-syncs';
 
-    protected $description = "Run leave syncs for tenants whose local 06:00/18:00 slot is due";
+    protected $description = 'Run leave syncs for tenants whose local 06:00/18:00 slot is due';
 
     public function handle(DispatchLeaveSyncs $dispatcher): int
     {

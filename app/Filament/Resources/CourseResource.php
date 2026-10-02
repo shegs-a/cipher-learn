@@ -9,6 +9,7 @@ use App\Enums\CourseStatus;
 use App\Filament\Concerns\AuthorizesViaPermissions;
 use App\Filament\Resources\CourseResource\Pages;
 use App\Filament\Resources\CourseResource\RelationManagers\LessonsRelationManager;
+use App\Filament\Support\AssignmentFeedback;
 use App\Models\Course;
 use App\Models\Employee;
 use Filament\Forms\Components\DatePicker;
@@ -18,7 +19,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Forms\Set;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\BulkActionGroup;
@@ -132,7 +132,7 @@ class CourseResource extends Resource
                         DatePicker::make('due_at')->label('Due date')->native(false),
                     ])
                     ->action(function (Course $record, array $data): void {
-                        $count = app(AssignCourseOrgWide::class)->handle(
+                        $result = app(AssignCourseOrgWide::class)->handle(
                             course: $record,
                             rationale: $data['rationale'],
                             department: $data['department'] ?: null,
@@ -140,11 +140,7 @@ class CourseResource extends Resource
                             assignedBy: auth()->user(),
                         );
 
-                        Notification::make()
-                            ->title('Course assigned')
-                            ->body("Assigned to {$count} ".str('employee')->plural($count).'.')
-                            ->success()
-                            ->send();
+                        AssignmentFeedback::bulk($result, 'Course assignment complete')->send();
                     }),
                 EditAction::make(),
             ])

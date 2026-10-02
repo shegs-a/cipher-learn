@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Hris\Data;
 
+use App\Hris\Contracts\HrisLeaveSource;
 use Carbon\CarbonImmutable;
 
 /**
  * One approved leave period for an employee, in OUR vocabulary — the neutral
- * currency of {@see \App\Hris\Contracts\HrisLeaveSource}. Vendor field names and
+ * currency of {@see HrisLeaveSource}. Vendor field names and
  * leave-type codes never leak past the adapter.
  *
  * Dates are calendar dates (no time, no zone): "on leave from 28 Sep to 7 Oct" is

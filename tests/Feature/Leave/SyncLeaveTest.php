@@ -14,9 +14,9 @@ use App\Models\User;
 use App\Notifications\LeaveSyncFailedNotification;
 use App\Support\Tenancy;
 use Carbon\CarbonImmutable;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
-use Database\Seeders\RolesAndPermissionsSeeder;
 use Tests\Support\FakeLeaveAdapter;
 
 uses(RefreshDatabase::class);
@@ -35,7 +35,7 @@ function leaveFor(string $employee, string $id, string $from, string $to, ?bool 
 }
 
 /** A user in the tenant holding the named role (permissions seeded for the tenant). */
-function userWithRole(Tenant $tenant, string $role): User
+function leaveUserWithRole(Tenant $tenant, string $role): User
 {
     $user = User::factory()->create(['tenant_id' => $tenant->id]);
 
@@ -169,8 +169,8 @@ it('marks the run failed and re-throws when the HRIS cannot be reached', functio
 it('alerts HRIS-sync operators on failure — and only on failure', function () {
     Notification::fake();
 
-    $admin = userWithRole($this->tenant, 'Tenant Admin');
-    $learner = userWithRole($this->tenant, 'Learner');
+    $admin = leaveUserWithRole($this->tenant, 'Tenant Admin');
+    $learner = leaveUserWithRole($this->tenant, 'Learner');
 
     FakeLeaveAdapter::$leave = [leaveFor('EMP-1', 'LV-1', '2026-10-01', '2026-10-09')];
     app(SyncLeave::class)->forTenant($this->tenant);

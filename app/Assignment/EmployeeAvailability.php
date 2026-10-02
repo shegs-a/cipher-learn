@@ -4,13 +4,11 @@ declare(strict_types=1);
 
 namespace App\Assignment;
 
-use App\Hris\HrisManager;
+use App\Hris\Sync\LeaveDataStatus;
 use App\Models\Employee;
 use App\Models\EmployeeLeave;
-use App\Models\SyncRun;
 use App\Models\Tenant;
 use Carbon\CarbonImmutable;
-use Throwable;
 
 /**
  * Answers "is this employee on leave right now?" — from the LOCAL `employee_leaves`
@@ -35,7 +33,7 @@ final class EmployeeAvailability
     /** @var array<string, bool> */
     private array $staleness = [];
 
-    public function __construct(private readonly HrisManager $hris) {}
+    public function __construct(private readonly LeaveDataStatus $status) {}
 
     /** The leave covering today for this employee, or null if they are not on leave. */
     public function currentLeave(Employee $employee, ?CarbonImmutable $now = null): ?EmployeeLeave
@@ -62,45 +60,14 @@ final class EmployeeAvailability
             && $l->ends_on->toDateString() >= $today);
     }
 
-    /**
-     * Whether this tenant's leave data is out of date: it HAS a leave feed, but
-     * the last successful sync is older than `hris.leave.stale_after_hours` (or
-     * there has never been one). A tenant whose HR system provides no leave at all
-     * is not "stale" — there is simply nothing to check.
-     */
+    /** Whether this tenant's leave data is out of date (see {@see LeaveDataStatus::isStale()}). */
     public function leaveDataIsStale(Tenant $tenant, ?CarbonImmutable $now = null): bool
     {
-        $key = (string) $tenant->getKey();
-
-        if ($now === null && isset($this->staleness[$key])) {
-            return $this->staleness[$key];
+        if ($now !== null) {
+            return $this->status->isStale($tenant, $now);
         }
 
-        try {
-            $tracked = $this->hris->leaveSourceFor($tenant) !== null;
-        } catch (Throwable) {
-            $tracked = false;
-        }
-
-        $stale = false;
-
-        if ($tracked) {
-            /** @var SyncRun|null $last */
-            $last = SyncRun::query()
-                ->withoutGlobalScopes()
-                ->where('tenant_id', $tenant->getKey())
-                ->where('type', 'leave_sync')
-                ->where('status', 'completed')
-                ->latest('finished_at')
-                ->first();
-
-            $threshold = ($now ?? CarbonImmutable::now())
-                ->subHours((int) config('hris.leave.stale_after_hours', 13));
-
-            $stale = $last === null || $last->finished_at === null || $last->finished_at->lt($threshold);
-        }
-
-        return $now === null ? $this->staleness[$key] = $stale : $stale;
+        return $this->staleness[(string) $tenant->getKey()] ??= $this->status->isStale($tenant);
     }
 
     public function tenantOf(Employee $employee): Tenant

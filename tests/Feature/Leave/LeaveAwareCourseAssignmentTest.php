@@ -17,6 +17,7 @@ use App\Models\Course;
 use App\Models\Employee;
 use App\Models\EmployeeLeave;
 use App\Models\Enrollment;
+use App\Models\SyncRun;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Notifications\AssignmentBlockedNotification;
@@ -70,7 +71,7 @@ function assignCourse(Employee $employee, Course $course, ?User $by = null)
     return app(AssignCourse::class)->attempt($employee, $course, 'Role development', assignedBy: $by);
 }
 
-function auditEvents(string $event)
+function leaveAuditEvents(string $event)
 {
     return AuditLog::query()->where('event', $event)->get();
 }
@@ -124,7 +125,7 @@ describe('individual course assignment', function () {
 
         assignCourse($employee, $this->course, $this->admin);
 
-        $entry = auditEvents('assignment.blocked')->sole();
+        $entry = leaveAuditEvents('assignment.blocked')->sole();
 
         expect($entry->tenant_id)->toBe($this->tenant->id)
             ->and($entry->created_at)->not->toBeNull()
@@ -165,7 +166,7 @@ describe('individual course assignment', function () {
 
         assignCourse($employee, $this->course, $this->admin);
 
-        $entry = auditEvents('assignment.allowed_on_leave')->sole();
+        $entry = leaveAuditEvents('assignment.allowed_on_leave')->sole();
 
         expect($entry->new_values)->toMatchArray([
             'leave_start' => '2026-09-28',
@@ -173,7 +174,7 @@ describe('individual course assignment', function () {
             'policy_allows_assignment_on_leave' => true,
             'block_reason' => null,
             'initiated_by_user_id' => $this->admin->id,
-        ])->and(auditEvents('assignment.blocked'))->toHaveCount(0);
+        ])->and(leaveAuditEvents('assignment.blocked'))->toHaveCount(0);
     });
 
     it('leaves existing behaviour untouched for an employee who is not on leave', function () {
@@ -184,8 +185,8 @@ describe('individual course assignment', function () {
         expect($result->isAssigned())->toBeTrue()
             ->and($result->assignedWhileOnLeave)->toBeFalse()
             ->and($result->enrollment->evidence)->not->toHaveKey('assigned_during_leave')
-            ->and(auditEvents('assignment.blocked'))->toHaveCount(0)
-            ->and(auditEvents('assignment.allowed_on_leave'))->toHaveCount(0);
+            ->and(leaveAuditEvents('assignment.blocked'))->toHaveCount(0)
+            ->and(leaveAuditEvents('assignment.allowed_on_leave'))->toHaveCount(0);
 
         Notification::assertSentTo($employee->user, CourseAssignedNotification::class);
         Notification::assertNotSentTo($this->admin, AssignmentBlockedNotification::class);
@@ -357,9 +358,9 @@ describe('bulk course assignment', function () {
 
         app(AssignCourseOrgWide::class)->handle($this->course, 'Mandatory', assignedBy: $this->admin);
 
-        $summary = auditEvents('assignment.bulk_completed')->sole();
+        $summary = leaveAuditEvents('assignment.bulk_completed')->sole();
 
-        expect(auditEvents('assignment.blocked'))->toHaveCount(2)
+        expect(leaveAuditEvents('assignment.blocked'))->toHaveCount(2)
             ->and($summary->new_values)->toMatchArray(['total' => 3, 'assigned' => 1, 'blocked' => 2, 'scope' => 'org-wide'])
             ->and(collect($summary->new_values['blocked_employees'])->pluck('employee_id')->sort()->values()->all())
             ->toBe(collect([$a->id, $b->id])->sort()->values()->all());
@@ -534,7 +535,7 @@ describe('the policy in different situations', function () {
 
         it('considers fresh data fresh, and data older than the threshold stale', function () {
             app(Tenancy::class)->runFor($this->hrTenant, function () {
-                $run = App\Models\SyncRun::factory()->create(['type' => 'leave_sync', 'status' => 'completed', 'finished_at' => now()->subHours(12)]);
+                $run = SyncRun::factory()->create(['type' => 'leave_sync', 'status' => 'completed', 'finished_at' => now()->subHours(12)]);
                 $employee = Employee::factory()->create();
 
                 expect(assignCourse($employee, Course::factory()->create())->leaveDataStale)->toBeFalse();

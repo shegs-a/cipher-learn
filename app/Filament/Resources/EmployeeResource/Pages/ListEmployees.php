@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\EmployeeResource\Pages;
 
 use App\Filament\Resources\EmployeeResource;
+use App\Filament\Support\SyncLeaveNowAction;
 use App\Hris\Sync\SyncEmployees;
 use App\Models\Tenant;
 use Filament\Actions\Action;
@@ -19,6 +20,8 @@ class ListEmployees extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            SyncLeaveNowAction::make(),
+
             // Re-run the authoritative sync on demand. Confirmation is required
             // because for a real tenant this hits the HR system's API, and the
             // exit sweep can flip people to `exited` — not a click to fire by

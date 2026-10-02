@@ -49,7 +49,7 @@ final readonly class AssignmentItemResult
             leaveEnd: $decision?->leaveEnd(),
             leaveType: $decision?->leave?->leave_type,
             assignedWhileOnLeave: $decision?->isAllowedWhileOnLeave() ?? false,
-            leaveDataStale: $decision?->leaveDataStale ?? false,
+            leaveDataStale: $decision !== null && $decision->leaveDataStale,
         );
     }
 

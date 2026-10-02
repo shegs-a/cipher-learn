@@ -9,6 +9,7 @@ use Database\Factories\SyncRunFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
@@ -35,6 +36,16 @@ class SyncRun extends Model
     use BelongsToTenant, HasFactory, HasUlids;
 
     protected $guarded = [];
+
+    /**
+     * Who clicked "Sync now", for a manual run.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function triggeredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'triggered_by_user_id');
+    }
 
     protected function casts(): array
     {

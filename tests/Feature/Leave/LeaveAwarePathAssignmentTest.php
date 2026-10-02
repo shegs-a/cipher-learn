@@ -116,7 +116,7 @@ describe('individual learning-path assignment', function () {
             ->and($result->assignedWhileOnLeave)->toBeTrue()
             ->and(PathEnrollment::count())->toBe(1)
             ->and(Enrollment::count())->toBe(3)
-            ->and(Enrollment::first()->evidence['assigned_during_leave'])->toBe(['start' => '2026-09-28', 'end' => '2026-10-07'])
+            ->and(Enrollment::first()->evidence['assigned_during_leave'])->toEqual(['start' => '2026-09-28', 'end' => '2026-10-07'])
             ->and(AuditLog::query()->where('event', 'assignment.allowed_on_leave')->count())->toBe(1);
 
         Notification::assertSentToTimes($employee->user, PathAssignedNotification::class, 1);

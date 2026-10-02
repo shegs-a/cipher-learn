@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Hris;
 
 use App\Hris\Contracts\HrisEmployeeSource;
+use App\Hris\Contracts\HrisLeaveSource;
 use App\Hris\Contracts\HrisWriteback;
 use App\Models\Tenant;
 use InvalidArgumentException;
@@ -81,6 +82,20 @@ final class HrisManager
         }
 
         return $instance;
+    }
+
+    /**
+     * The tenant's adapter as a leave source, or null when it cannot report leave.
+     *
+     * Leave is an optional capability, so an adapter that does not implement
+     * {@see HrisLeaveSource} (or says it does not support it) simply yields null
+     * and the leave sync skips that tenant.
+     */
+    public function leaveSourceFor(Tenant $tenant): ?HrisLeaveSource
+    {
+        $adapter = $this->for($tenant);
+
+        return $adapter instanceof HrisLeaveSource && $adapter->supportsLeave() ? $adapter : null;
     }
 
     private function defaultAdapter(): string

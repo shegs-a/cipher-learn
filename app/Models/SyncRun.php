@@ -21,6 +21,9 @@ use Illuminate\Support\Carbon;
  *
  * @property string $type
  * @property string $status
+ * @property string $trigger scheduled|manual
+ * @property string|null $triggered_by_user_id
+ * @property string|null $slot tenant-local "date@HH:MM" for scheduled leave syncs
  * @property bool $dry_run
  * @property array<string, mixed>|null $stats
  * @property Carbon $started_at

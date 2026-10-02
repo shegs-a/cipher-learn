@@ -61,6 +61,12 @@ class Employee extends Model
         return $this->hasMany(Employee::class, 'manager_id');
     }
 
+    /** @return HasMany<EmployeeLeave, $this> */
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(EmployeeLeave::class);
+    }
+
     /** @return HasMany<Enrollment, $this> */
     public function enrollments(): HasMany
     {

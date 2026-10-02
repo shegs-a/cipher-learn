@@ -6,9 +6,12 @@ namespace App\Hris\Adapters;
 
 use App\Enums\EmployeeStatus;
 use App\Hris\Contracts\HrisEmployeeSource;
+use App\Hris\Contracts\HrisLeaveSource;
 use App\Hris\Contracts\HrisWriteback;
 use App\Hris\Data\EmployeeData;
+use App\Hris\Data\LeaveData;
 use App\Hris\Data\TrainingCompletionData;
+use Carbon\CarbonImmutable;
 
 /**
  * An in-memory HR system: a realistic, fully deterministic organisation.
@@ -28,7 +31,7 @@ use App\Hris\Data\TrainingCompletionData;
  * The generated org is a three-level tree: one MD, a handful of department heads,
  * and their reports — enough shape for the Sprint 6 manager view to be real.
  */
-final class MockHrisAdapter implements HrisEmployeeSource, HrisWriteback
+final class MockHrisAdapter implements HrisEmployeeSource, HrisLeaveSource, HrisWriteback
 {
     /** Deterministic PRNG state; re-seeded at the start of every generation. */
     private int $randomState = 0;
@@ -80,6 +83,73 @@ final class MockHrisAdapter implements HrisEmployeeSource, HrisWriteback
     public function supportsWriteback(): bool
     {
         return true;
+    }
+
+    public function supportsLeave(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Deterministic leave for the generated org, anchored on today's date.
+     *
+     * Each active employee is bucketed by a hash of (seed, external id) — NOT by the
+     * employee generator's PRNG, so adding leave never reshuffles the org. Roughly
+     * 17% of people are on leave right now, 9% have leave coming up and 7% had some
+     * recently, which gives the demo and the tests every case the policy cares about:
+     * current, upcoming and past. Only leave overlapping the requested window is
+     * returned, as a real adapter would.
+     *
+     * @return iterable<int, LeaveData>
+     */
+    public function fetchLeave(CarbonImmutable $from, CarbonImmutable $to): iterable
+    {
+        $today = CarbonImmutable::today();
+        $seed = (int) ($this->settings['seed'] ?? config('hris.mock.seed', 20260722));
+        $types = ['Annual', 'Sick', 'Parental', 'Study'];
+
+        $leave = [];
+
+        foreach ($this->generate() as $employee) {
+            if ($employee->status === EmployeeStatus::Exited) {
+                continue;
+            }
+
+            $hash = crc32($seed.'|'.$employee->externalId);
+            $bucket = $hash % 100;
+            $length = 4 + intdiv($hash, 100) % 11; // 4–14 days
+            $type = $types[intdiv($hash, 1000) % count($types)];
+
+            $startsOn = match (true) {
+                $bucket < 17 => $today->subDays(intdiv($hash, 10000) % 3),
+                $bucket < 26 => $today->addDays(5 + intdiv($hash, 10000) % 25),
+                $bucket < 33 => $today->subDays(12 + intdiv($hash, 10000) % 30),
+                default => null,
+            };
+
+            if ($startsOn === null) {
+                continue;
+            }
+
+            $endsOn = $startsOn->addDays($length - 1);
+
+            // A real API only returns leave overlapping the requested window.
+            if ($endsOn->lt($from) || $startsOn->gt($to)) {
+                continue;
+            }
+
+            $leave[] = new LeaveData(
+                employeeExternalId: $employee->externalId,
+                leaveExternalId: 'LV-'.$employee->externalId.'-'.$startsOn->format('Ymd'),
+                startsOn: $startsOn,
+                endsOn: $endsOn,
+                type: $type,
+                // The mock behaves like a vendor with an authoritative flag.
+                isCurrent: $startsOn->lte($today) && $endsOn->gte($today),
+            );
+        }
+
+        return $leave;
     }
 
     /**

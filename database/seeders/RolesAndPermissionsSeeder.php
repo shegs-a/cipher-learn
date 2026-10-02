@@ -37,6 +37,8 @@ class RolesAndPermissionsSeeder extends Seeder
         'roles.view', 'roles.assign', 'roles.manage',
         'rules.manage',        // competency rules — consumed Sprint 4
         'audit.view',          // read the tamper-evident audit trail (Sprint 10)
+        'hris.sync',           // trigger HRIS syncs ("Sync leave now") + get failure alerts (Sprint 13)
+        'settings.assignment_policy', // change the tenant's assignment policy (Sprint 13)
     ];
 
     /**

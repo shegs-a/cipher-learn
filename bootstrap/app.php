@@ -43,6 +43,15 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping()
             ->onOneServer();
 
+        // Leave sync at each tenant's own 06:00 and 18:00. The scheduler fires one
+        // wall-clock time in one timezone, so it ticks every 10 minutes and the
+        // dispatcher decides per tenant (timezone-aware, idempotent, catches a
+        // missed tick) whether a slot is due.
+        $schedule->command('hris:dispatch-leave-syncs')
+            ->everyTenMinutes()
+            ->withoutOverlapping()
+            ->onOneServer();
+
         // Verify each tenant's tamper-evident audit chain nightly; a broken chain
         // makes the command exit non-zero — the signal an alerting layer watches.
         $schedule->command('audit:verify --all')

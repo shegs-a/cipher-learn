@@ -27,7 +27,8 @@ class DatabaseSeeder extends Seeder
     {
         $tenant = Tenant::firstOrCreate(
             ['slug' => 'demo'],
-            ['name' => 'Demo Organisation', 'hris_adapter' => 'mock'],
+            // The timezone sets when the twice-daily leave sync runs for this tenant.
+            ['name' => 'Demo Organisation', 'timezone' => 'Africa/Lagos', 'hris_adapter' => 'mock'],
         );
 
         $admin = User::firstOrCreate(

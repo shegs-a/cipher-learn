@@ -10,13 +10,14 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use InvalidArgumentException;
 
 /**
  * A customer organisation. The root of the tenant tree — everything else hangs
  * off `tenant_id`. Tenant itself is not tenant-scoped (there is no outer tenant
  * to scope it by).
  *
- * @property string $timezone IANA identifier, e.g. Africa/Lagos
+ * @property string|null $timezone IANA identifier, e.g. Africa/Lagos (null only before first save: the column defaults to UTC)
  * @property array<string, mixed>|null $settings
  */
 class Tenant extends Model
@@ -25,6 +26,23 @@ class Tenant extends Model
     use HasFactory, HasUlids;
 
     protected $guarded = [];
+
+    protected static function booted(): void
+    {
+        // The timezone drives the leave-sync slots and "today" in the leave check, so
+        // a typo must fail loudly at write time instead of silently running every
+        // sync at the wrong hour.
+        static::saving(function (Tenant $tenant): void {
+            // Not supplied: the column default (UTC) applies, as for pre-existing rows.
+            if ($tenant->timezone === null) {
+                return;
+            }
+
+            if (! in_array($tenant->timezone, timezone_identifiers_list(), true)) {
+                throw new InvalidArgumentException("Invalid timezone [{$tenant->timezone}]; use an IANA identifier such as Africa/Lagos.");
+            }
+        });
+    }
 
     protected function casts(): array
     {

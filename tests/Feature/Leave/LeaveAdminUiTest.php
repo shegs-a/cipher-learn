@@ -118,6 +118,9 @@ describe('the "Sync leave now" button', function () {
     });
 
     it('records a manual run (with who and what) that shows up in the sync history', function () {
+        // Run the queued job inline whatever the environment's queue driver is.
+        config(['queue.default' => 'sync']);
+
         Livewire::test(ListSyncRuns::class)->callAction('syncLeave');
 
         $run = SyncRun::query()->where('type', 'leave_sync')->sole();
